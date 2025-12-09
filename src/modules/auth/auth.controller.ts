@@ -21,7 +21,8 @@ export class AuthController {
     @ApiCreatedResponse({ description: 'User created successfully.', type: MessageResponseDto })
     @ApiBadRequestResponse({ description: 'Validation failed.' })
     async register(@Body() dto: RegisterDto) {
-        await this.usersService.createUser(dto.email, dto.password, dto.name);
+        const user = await this.usersService.createUser(dto.email, dto.password, dto.name);
+        await this.usersService.createEmailVerification(user);
         return { message: 'User created. Check email for verification.' };
     }
 
