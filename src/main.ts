@@ -14,14 +14,14 @@ async function bootstrap() {
   }))
 
   const config = new DocumentBuilder()
-    .setTitle("Auth service")
-    .setDescription("Auth service for social media")
+    .setTitle("Auth service API")
+    .setDescription("API documentation for the auth service")
     .setVersion("1.0")
     .addBearerAuth()
     .build()
 
   const document = SwaggerModule.createDocument(app, config)
-  SwaggerModule.setup("api", app, document)
+  SwaggerModule.setup("api/auth", app, document)
 
   app.enableCors()
 
