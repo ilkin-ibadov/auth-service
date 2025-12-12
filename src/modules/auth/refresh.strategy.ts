@@ -31,7 +31,7 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refres
         return {
             id: user._id.toString(),
             email: user.email,
-            role: user.role,
+            // role: user.role,
             refreshToken
         }
     }

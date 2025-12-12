@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsString, MinLength, IsEnum, IsNotEmpty } from 'class-validator';
-import { Role } from '../../../common/enums/role.enum';
+// import { Role } from '../../../common/enums/role.enum';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -12,6 +12,14 @@ export class CreateUserDto {
   email: string;
 
   @ApiProperty({
+    description: 'Username of the user',
+    example: 'newuser',
+  })
+  @IsNotEmpty({ message: 'Username is required' })
+  @IsString({ message: 'Username must be of type string' })
+  username: string;
+
+  @ApiProperty({
     description: 'Password for the new user account (minimum 8 characters)',
     example: 'StrongPass123!',
     minLength: 8,
@@ -21,12 +29,12 @@ export class CreateUserDto {
   @MinLength(8, { message: 'Password must be at least 8 characters' })
   password: string;
 
-  @ApiProperty({
-    description: 'Role assigned to the user',
-    enum: Role,
-    example: Role.USER,
-    default: Role.USER,
-  })
-  @IsEnum(Role, { message: `Role must be one of: ${Object.values(Role).join(', ')}` })
-  role: Role;
+  // @ApiProperty({
+  //   description: 'Role assigned to the user',
+  //   enum: Role,
+  //   example: Role.USER,
+  //   default: Role.USER,
+  // })
+  // @IsEnum(Role, { message: `Role must be one of: ${Object.values(Role).join(', ')}` })
+  // role: Role;
 }

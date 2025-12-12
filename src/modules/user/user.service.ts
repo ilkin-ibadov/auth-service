@@ -11,6 +11,7 @@ import { KafkaService } from '../kafka/kafka.service';
 import { MongoService } from '../mongo/mongo.service';
 import { randomBytes } from "crypto"
 import { addSeconds } from "date-fns"
+import { RegisterDto } from '../auth/dto/register.dto';
 
 @Injectable()
 export class UserService {
@@ -25,11 +26,12 @@ export class UserService {
         private mongoService: MongoService
     ) { }
 
-    async createUser(email: string, password: string, name?: string) {
+    async createUser(dto: RegisterDto) {
+        const { email, password, username } = dto
         const existing = await this.userRepo.findOne({ where: { email } })
         if (existing) throw new BadRequestException('Email already in use')
         const passwordHash = await bcrypt.hash(password, this.saltRounds)
-        const user = this.userRepo.create({ email, passwordHash, name })
+        const user = this.userRepo.create({ email, passwordHash, username })
         const saved = await this.userRepo.save(user)
         // emit kafka event
         this.kafkaService.produce('auth.user.created', { userId: saved.id, email: saved.email, createdAt: new Date() })
@@ -179,7 +181,7 @@ export class UserService {
         return isNaN(n) ? 7 * 86400 : n
     }
 
-    async listAll(){
-        return this.userRepo.find({select: ['id', 'email', 'name', 'isVerified', 'createdAt']})
+    async listAll() {
+        return this.userRepo.find({ select: ['id', 'email', 'username', 'isVerified', 'createdAt'] })
     }
 }

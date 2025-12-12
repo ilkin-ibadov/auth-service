@@ -6,14 +6,14 @@ import {
 } from 'typeorm';
 
 @Entity({ name: 'users' })
-@Unique(['email'])
+@Unique(['email', 'username'])
 export class User extends CommonEntity {
 
   @Column() email: string;
 
   @Column() passwordHash: string;
 
-  @Column({ nullable: true }) name?: string;
+  @Column({ nullable: true }) username: string;
 
   @Column({ default: false }) isVerified: boolean;
 
