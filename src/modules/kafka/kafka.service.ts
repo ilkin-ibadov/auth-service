@@ -9,7 +9,7 @@ export class KafkaService implements OnModuleInit {
     async onModuleInit() {
         this.producer = this.kafka.producer()
         await this.producer.connect()
-        console.log('Kafka producer connected')
+        console.log('Auth: Kafka producer connected')
     }
 
     async produce(topic: string, message: Record<string, any>) {
@@ -19,7 +19,7 @@ export class KafkaService implements OnModuleInit {
                 messages: [{ value: JSON.stringify(message) }]
             })
         } catch (error) {
-            console.error('Kafka produce error', error)
+            console.error('Auth: Kafka produce error', error)
         }
     }
 

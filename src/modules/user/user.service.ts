@@ -8,10 +8,12 @@ import { UserSession } from "./session.entity"
 import * as bcrypt from 'bcrypt'
 import { MailService } from '../mail/mail.service';
 import { KafkaService } from '../kafka/kafka.service';
+import { kafkaEvent } from '../kafka/kafka-event.util';
 import { MongoService } from '../mongo/mongo.service';
 import { randomBytes } from "crypto"
 import { addSeconds } from "date-fns"
 import { RegisterDto } from '../auth/dto/register.dto';
+import { UserReplicaDto } from './dto/user-replica.dto';
 
 @Injectable()
 export class UserService {
@@ -34,7 +36,15 @@ export class UserService {
         const user = this.userRepo.create({ email, passwordHash, username })
         const saved = await this.userRepo.save(user)
         // emit kafka event
-        this.kafkaService.produce('auth.user.created', { userId: saved.id, email: saved.email, createdAt: new Date() })
+        this.kafkaService.produce(
+            'auth.user.created',
+            kafkaEvent('auth.user.created', {
+                id: saved.id,
+                email: saved.email,
+                username: saved.username,
+                createdAt: saved.createdAt,
+            }),
+        );
         await this.mongoService.log('info', 'User created', { userId: saved.id, email: saved.email })
         return saved
     }
@@ -82,7 +92,13 @@ export class UserService {
                 await this.evRepo.save(candidate)
                 candidate.user.isVerified = true
                 await this.userRepo.save(candidate.user)
-                await this.kafkaService.produce('auth.user.verified', { userId: candidate.user.id, verifiedAt: new Date() })
+                await this.kafkaService.produce(
+                    'auth.user.verified',
+                    kafkaEvent('auth.user.verified', {
+                        id: candidate.user.id,
+                        verifiedAt: new Date(),
+                    }),
+                );
                 await this.mongoService.log('info', 'User verified', { userId: candidate.user.id })
                 return candidate.user
             }
@@ -122,7 +138,13 @@ export class UserService {
 
                 // revoke all sessions
                 await this.sessionRepo.update({ userId: candidate.user.id, revoked: false }, { revoked: true, revokedAt: new Date() })
-                await this.kafkaService.produce('auth.user.password.changed', { userId: candidate.user.id, changedAt: new Date() })
+                await this.kafkaService.produce(
+                    'auth.user.password.changed',
+                    kafkaEvent('auth.user.password.changed', {
+                        id: candidate.user.id,
+                        changedAt: new Date(),
+                    }),
+                );
                 await this.mongoService.log('info', 'Password changed via reset', { userId: candidate.user.id })
                 return candidate.user
             }
@@ -148,7 +170,14 @@ export class UserService {
         })
 
         const saved = await this.sessionRepo.save(session)
-        await this.kafkaService.produce('auth.session.created', { sessionId: saved.id, userId: user.id, createdAt: saved.createdAt })
+        await this.kafkaService.produce(
+            'auth.session.created',
+            kafkaEvent('auth.session.created', {
+                sessionId: saved.id,
+                userId: user.id,
+                createdAt: saved.createdAt,
+            }),
+        );
         await this.mongoService.log('info', 'Session created', { sessionId: saved.id, userId: user.id, ip, device })
         return saved
     }
@@ -159,7 +188,13 @@ export class UserService {
         session.revoked = true
         session.revokedAt = new Date()
         await this.sessionRepo.save(session)
-        await this.kafkaService.produce('auth.session.revoked', { sessionId, revokedAt: session.revokedAt })
+        await this.kafkaService.produce(
+            'auth.session.revoked',
+            kafkaEvent('auth.session.revoked', {
+                sessionId,
+                revokedAt: session.revokedAt,
+            }),
+        );
         await this.mongoService.log('info', 'Session revoked', { sessionId })
     }
 
@@ -183,5 +218,17 @@ export class UserService {
 
     async listAll() {
         return this.userRepo.find({ select: ['id', 'email', 'username', 'isVerified', 'createdAt'] })
+    }
+
+    async getUsersForReplica(): Promise<UserReplicaDto[]> {
+        const users = await this.userRepo.find({
+            select: ['id', 'username'],
+        });
+
+        return users.map((u) => ({
+            id: u.id,
+            username: u.username,
+            active: true,
+        }));
     }
 }

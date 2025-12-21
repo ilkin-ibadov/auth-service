@@ -7,6 +7,7 @@ import { PasswordReset } from './password-reset.entity';
 import { EmailVerification } from './email-verification.entity';
 import { User as UserEntity } from './user.entity';
 import { MailModule } from '../mail/mail.module';
+import { UserInternalController } from "./user-internal.controller";
 
 @Module({
     imports: [
@@ -14,7 +15,7 @@ import { MailModule } from '../mail/mail.module';
         MailModule
     ],
     providers: [UserService],
-    controllers: [UserController],
+    controllers: [UserController, UserInternalController],
     exports: [UserService]
 })
 
