@@ -28,27 +28,6 @@ export class UserService {
         private mongoService: MongoService
     ) { }
 
-    async createUser(dto: RegisterDto) {
-        const { email, password, username } = dto
-        const existing = await this.userRepo.findOne({ where: { email } })
-        if (existing) throw new BadRequestException('Email already in use')
-        const passwordHash = await bcrypt.hash(password, this.saltRounds)
-        const user = this.userRepo.create({ email, passwordHash, username })
-        const saved = await this.userRepo.save(user)
-        // emit kafka event
-        this.kafkaService.produce(
-            'auth.user.created',
-            kafkaEvent('auth.user.created', {
-                id: saved.id,
-                email: saved.email,
-                username: saved.username,
-                createdAt: saved.createdAt,
-            }),
-        );
-        await this.mongoService.log('info', 'User created', { userId: saved.id, email: saved.email })
-        return saved
-    }
-
     async findByEmail(email: string) {
         return this.userRepo.findOne({ where: { email } })
     }
@@ -92,6 +71,7 @@ export class UserService {
                 await this.evRepo.save(candidate)
                 candidate.user.isVerified = true
                 await this.userRepo.save(candidate.user)
+
                 await this.kafkaService.produce(
                     'auth.user.verified',
                     kafkaEvent('auth.user.verified', {
@@ -138,6 +118,7 @@ export class UserService {
 
                 // revoke all sessions
                 await this.sessionRepo.update({ userId: candidate.user.id, revoked: false }, { revoked: true, revokedAt: new Date() })
+
                 await this.kafkaService.produce(
                     'auth.user.password.changed',
                     kafkaEvent('auth.user.password.changed', {
@@ -170,6 +151,7 @@ export class UserService {
         })
 
         const saved = await this.sessionRepo.save(session)
+
         await this.kafkaService.produce(
             'auth.session.created',
             kafkaEvent('auth.session.created', {
@@ -188,6 +170,7 @@ export class UserService {
         session.revoked = true
         session.revokedAt = new Date()
         await this.sessionRepo.save(session)
+
         await this.kafkaService.produce(
             'auth.session.revoked',
             kafkaEvent('auth.session.revoked', {
@@ -230,5 +213,52 @@ export class UserService {
             username: u.username,
             active: true,
         }));
+    }
+
+    async createUser(dto: RegisterDto) {
+        const { email, password, username } = dto
+        const existing = await this.userRepo.findOne({ where: { email } })
+        if (existing) throw new BadRequestException('Email already in use')
+        const passwordHash = await bcrypt.hash(password, this.saltRounds)
+        const user = this.userRepo.create({ email, passwordHash, username })
+        const saved = await this.userRepo.save(user)
+
+        const topic = 'auth.user.created';
+
+        const payload = kafkaEvent(topic, {
+            id: saved.id,
+            email: saved.email,
+            username: saved.username,
+            createdAt: saved.createdAt,
+        });
+
+        // 🔍 log BEFORE producing
+        console.log('Auth: [KAFKA] Producing event', {
+            topic,
+            payload,
+        });
+
+        // emit kafka event
+        try {
+            await this.kafkaService.produce(topic, payload);
+
+            // ✅ log AFTER successful produce
+            console.log('Auth: [KAFKA] Event produced successfully', {
+                topic,
+                userId: saved.id,
+            });
+        } catch (err) {
+            // ❌ log if producing fails
+            console.error('[Auth: KAFKA] Failed to produce event', {
+                topic,
+                payload,
+                error: err.message,
+            });
+
+            await this.mongoService.log('info', 'User created', { userId: saved.id, email: saved.email })
+            return saved
+        }
+
+
     }
 }
